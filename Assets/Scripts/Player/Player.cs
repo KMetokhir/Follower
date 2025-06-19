@@ -1,45 +1,40 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(CharacterController))]
+[RequireComponent(typeof(PlayerMover), typeof(PlayerRotator))]
 public class Player : MonoBehaviour
 {
-    [SerializeField] private float _speed=3;
-    [SerializeField] private float _horizontalTurnSensitivity = 4;
+    private PlayerInput _input;
+    private InputAction _movementInput;
 
-    private Transform _transform;
-    private CharacterController _characterController;
+    private PlayerMover _mover;
+    private PlayerRotator _rotator;
 
     private void Awake()
     {
-        _transform = transform;
-        _characterController = GetComponent<CharacterController>();
+        _mover = GetComponent<PlayerMover>();
+        _rotator = GetComponent<PlayerRotator>();
+
+        _input = new PlayerInput();
+    }
+
+    private void OnEnable()
+    {
+        _movementInput = _input.Player.Movement;
+        _movementInput.Enable();
+    }
+
+    private void OnDisable()
+    {
+        _movementInput.Disable();
     }
 
     private void Update()
     {
-        if (_characterController != null)
-        {
-            Vector3 forward = Vector3.ProjectOnPlane(_transform.forward, Vector3.up).normalized;
-            Vector3 right = Vector3.ProjectOnPlane(_transform.right, Vector3.up).normalized;
+        float xAxis = _movementInput.ReadValue<Vector2>().x;
+        float yAxis = _movementInput.ReadValue<Vector2>().y;
 
-           /* Vector3 playerInput = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
-            Vector3 playerSpeed= playerInput*_speed*Time.deltaTime;*/
-
-            Vector3 movement = forward * Input.GetAxis("Vertical") * _speed + right* Input.GetAxis("Horizontal") * _speed;
-            movement *= Time.deltaTime;
-
-            transform.Rotate(Vector3.up * _horizontalTurnSensitivity * Input.GetAxis("Mouse X"));
-
-            if (_characterController.isGrounded)
-            {
-                _characterController.Move(movement + Physics.gravity);
-            }
-            else
-            {
-                _characterController.Move(_characterController.velocity + Physics.gravity*Time.deltaTime);
-            }
-        }
+        _mover.Move(yAxis, xAxis);
+        _rotator.Rotate(Mouse.current.delta.x.ReadValue());
     }
 }

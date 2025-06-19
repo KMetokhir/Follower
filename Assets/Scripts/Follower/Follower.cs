@@ -1,89 +1,58 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UIElements;
-using static UnityEngine.GraphicsBuffer;
 
-[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(FollowerMover), typeof(DistanceChecker), typeof(FollowerRotator))]
 public class Follower : MonoBehaviour
 {
-    [SerializeField] private Rigidbody _rigidbody;
-    [SerializeField] private float _speed;
-    [SerializeField] private float _rotationSpeed;
-    [SerializeField] private float _distanceOffset;
-    [SerializeField] private GroundChecker _groundChecker;
+    [SerializeField] private Transform _target;
 
-    private bool _isMoving = false;
-    [SerializeField]  private Transform _target;
+    private DistanceChecker _distanceChecker;
+    private bool _targetReached = false;
 
-    private void OnValidate()
+    private FollowerMover _mover;
+    private FollowerRotator _rotator;
+
+    private void OnEnable()
     {
-        _speed = Mathf.Abs(_speed);
+        _distanceChecker.DistanceOffsetReached += OnTargetReached;
+        _distanceChecker.OutOfDistanceOffset += OnTargetLost;
+    }
+
+    private void OnDisable()
+    {
+        _distanceChecker.DistanceOffsetReached -= OnTargetReached;
+        _distanceChecker.OutOfDistanceOffset -= OnTargetLost;
     }
 
     private void Awake()
     {
-        StartFollow(_target);
+        _distanceChecker = GetComponent<DistanceChecker>();
+        _mover = GetComponent<FollowerMover>();
+        _rotator = GetComponent<FollowerRotator>();
     }
 
-    public void StartFollow(Transform target)
+    private void OnTargetLost()
     {
-        _isMoving = true;
-        _target = target;
+        _targetReached = false;
     }
 
-    private void StopMoving()
+    private void OnTargetReached()
     {
-        _isMoving = false;
+        _mover.StopMoving();
+        _targetReached = true;
     }
 
-    private float GetSqrDistance(Vector3 ownerPosition, Vector3 targetPosition)
+    private void FixedUpdate()
     {
-        targetPosition = new Vector3(targetPosition.x, ownerPosition.y, targetPosition.z);
+        _distanceChecker.ProcessDistance(transform.position, _target.position);
 
-        return (targetPosition - ownerPosition).sqrMagnitude;
-    }
-
-    private void RotateTo(Vector3 target)
-    {
-        target = new Vector3(target.x, transform.position.y, target.z);
-        Vector3 relativePos = target - transform.position;
-        Quaternion targetRotation = Quaternion.LookRotation(relativePos, Vector3.up);
-
-        transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, _rotationSpeed * Time.deltaTime);
-    }
-
-    private void Move()
-    {
-        if (_groundChecker.IsGrounded)
+        if (_targetReached == false)
         {
-            Debug.Log("MOVE");
-           
-            Vector3 forward = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
-            Vector3 velocity = new Vector3(forward.x * _speed, _rigidbody.velocity.y, forward.z * _speed);
-            _rigidbody.velocity = velocity;
-        }
-        else
-        {
-            Debug.Log("NOT MOVE");
-
+            _mover.Move();
         }
     }
 
     private void Update()
     {
-        if (_isMoving)
-        {
-            Move();
-            RotateTo(_target.position);
-
-            float sqrDistance = GetSqrDistance(transform.position, _target.position);
-
-            if (sqrDistance <= _distanceOffset)
-            {
-                StopMoving();
-            }
-        }
+        _rotator.RotateTo(_target.position);
     }
 }
-
